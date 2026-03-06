@@ -243,7 +243,7 @@ async fn build_tools_list(config: &ServerConfig) -> Result<Vec<Value>, GwsError>
         let (api_name, version) =
             crate::parse_service_and_version(&[svc_name.to_string()], svc_name)?;
         if let Ok(doc) = crate::discovery::fetch_discovery_document(&api_name, &version).await {
-            walk_resources(&doc.name, &doc.resources, &mut tools);
+            walk_resources(svc_name, &doc.resources, &mut tools);
         } else {
             eprintln!("[gws mcp] Warning: Failed to load discovery document for service '{}'. It will not be available as a tool.", svc_name);
         }
@@ -327,7 +327,7 @@ async fn build_compact_tools_list(config: &ServerConfig) -> Result<Vec<Value>, G
 
     // Add gws_discover meta-tool
     tools.push(json!({
-        "name": "gws_discover",
+        "name": "gws-discover",
         "description": "Query available resources, methods, and parameter schemas for any enabled service. Call with service only to list resources; add resource to list methods; add method to get full parameter schema.",
         "inputSchema": {
             "type": "object",
@@ -359,7 +359,7 @@ async fn build_compact_tools_list(config: &ServerConfig) -> Result<Vec<Value>, G
 
 fn append_workflow_tools(tools: &mut Vec<Value>) {
     tools.push(json!({
-        "name": "workflow_standup_report",
+        "name": "workflow-standup-report",
         "description": "Today's meetings + open tasks as a standup summary",
         "inputSchema": {
             "type": "object",
@@ -369,7 +369,7 @@ fn append_workflow_tools(tools: &mut Vec<Value>) {
         }
     }));
     tools.push(json!({
-        "name": "workflow_meeting_prep",
+        "name": "workflow-meeting-prep",
         "description": "Prepare for your next meeting: agenda, attendees, and linked docs",
         "inputSchema": {
             "type": "object",
@@ -379,7 +379,7 @@ fn append_workflow_tools(tools: &mut Vec<Value>) {
         }
     }));
     tools.push(json!({
-        "name": "workflow_email_to_task",
+        "name": "workflow-email-to-task",
         "description": "Convert a Gmail message into a Google Tasks entry",
         "inputSchema": {
             "type": "object",
@@ -391,7 +391,7 @@ fn append_workflow_tools(tools: &mut Vec<Value>) {
         }
     }));
     tools.push(json!({
-        "name": "workflow_weekly_digest",
+        "name": "workflow-weekly-digest",
         "description": "Weekly summary: this week's meetings + unread email count",
         "inputSchema": {
             "type": "object",
@@ -401,7 +401,7 @@ fn append_workflow_tools(tools: &mut Vec<Value>) {
         }
     }));
     tools.push(json!({
-        "name": "workflow_file_announce",
+        "name": "workflow-file-announce",
         "description": "Announce a Drive file in a Chat space",
         "inputSchema": {
             "type": "object",
@@ -417,10 +417,10 @@ fn append_workflow_tools(tools: &mut Vec<Value>) {
 
 fn walk_resources(prefix: &str, resources: &HashMap<String, RestResource>, tools: &mut Vec<Value>) {
     for (res_name, res) in resources {
-        let new_prefix = format!("{}_{}", prefix, res_name);
+        let new_prefix = format!("{}-{}", prefix, res_name);
 
         for (method_name, method) in &res.methods {
-            let tool_name = format!("{}_{}", new_prefix, method_name);
+            let tool_name = format!("{}-{}", new_prefix, method_name);
             let mut description = method.description.clone().unwrap_or_default();
             if description.is_empty() {
                 description = format!("Execute the {} Google API method", tool_name);
@@ -664,13 +664,13 @@ async fn handle_tools_call(params: &Value, config: &ServerConfig) -> Result<Valu
     let default_args = json!({});
     let arguments = params.get("arguments").unwrap_or(&default_args);
 
-    if tool_name.starts_with("workflow_") {
+    if tool_name.starts_with("workflow-") {
         return Err(GwsError::Other(anyhow::anyhow!(
             "Workflows are not yet fully implemented via MCP"
         )));
     }
 
-    if tool_name == "gws_discover" {
+    if tool_name == "gws-discover" {
         return handle_discover(arguments, config).await;
     }
 
@@ -714,8 +714,8 @@ async fn handle_tools_call(params: &Value, config: &ServerConfig) -> Result<Valu
         return execute_mcp_method(&doc, method, arguments).await;
     }
 
-    // Full mode: tool_name encodes service_resource_method (e.g., drive_files_list)
-    let parts: Vec<&str> = tool_name.split('_').collect();
+    // Full mode: tool_name encodes service-resource-method (e.g., drive-files-list)
+    let parts: Vec<&str> = tool_name.split('-').collect();
     if parts.len() < 3 {
         return Err(GwsError::Validation(format!(
             "Invalid API tool name: {}",
@@ -1146,7 +1146,7 @@ mod tests {
         let mut tools = Vec::new();
         append_workflow_tools(&mut tools);
         assert_eq!(tools.len(), 5);
-        assert_eq!(tools[0]["name"], "workflow_standup_report");
-        assert_eq!(tools[4]["name"], "workflow_file_announce");
+        assert_eq!(tools[0]["name"], "workflow-standup-report");
+        assert_eq!(tools[4]["name"], "workflow-file-announce");
     }
 }

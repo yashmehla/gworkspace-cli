@@ -1,4 +1,3 @@
-#!/bin/bash
 # Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#!/usr/bin/env bash
 set -euo pipefail
 
-# Check if cargo-llvm-cov is installed
-if ! cargo llvm-cov --version &> /dev/null; then
-  echo "cargo-llvm-cov is not installed. Installing..."
-  cargo install cargo-llvm-cov
-fi
+# Ensure cargo-llvm-cov is available (fast check)
+command -v cargo-llvm-cov >/dev/null 2>&1 || {
+  echo "Installing cargo-llvm-cov..."
+  cargo install --locked cargo-llvm-cov
+}
 
-# Run coverage and generate HTML report
 echo "Running tests with coverage..."
-cargo llvm-cov --all-features --workspace --html
-cargo llvm-cov --all-features --workspace # Print text summary
 
-echo "Coverage report generated at target/llvm-cov/html/index.html"
+# Single invocation: generates HTML + prints summary
+cargo llvm-cov --all-features --workspace --html --summary-only
 
-# Open the report if on macOS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  open target/llvm-cov/html/index.html
-fi
+REPORT="target/llvm-cov/html/index.html"
+echo "Coverage report: $REPORT"
+
+# Open report (macOS only)
+[[ "${OSTYPE:-}" == darwin* ]] && open "$REPORT"
